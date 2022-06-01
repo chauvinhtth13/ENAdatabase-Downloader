@@ -80,14 +80,14 @@ def sub_download(position, file_name, path_save, initial, id_code, accession):
             ftp.cwd(accession)
         finally:
             total_size = ftp.size(file_name)
-            with open('%s/%s' % (path_save, file_name), 'wb') as f:
+            with open('%s/%s' % (path_save, file_name), 'wb') as file_save:
                 with tqdm(total=total_size, unit='B', unit_scale=True, desc=file_name, position=position) as pbar:
                     def cb(data):
                         pbar.update(len(data))
-                        f.write(data)
+                        file_save.write(data)
 
                     ftp.retrbinary('RETR {}'.format(file_name), cb)
-            f.close()
+            file_save.close()
     ftp.close()
 
 
@@ -113,7 +113,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--ifile', type=str, default='',
                         help='Input list accession number by file (.csv)')
     parser.add_argument('-l', '--list', type=str, default='',
-                        help='Input list accession number by hand. Format is accesion1,...,accessionN. Note: no space '
+                        help='Input list accession number by hand. Format is accession1,...,accessionN. Note: no space '
                              'between accession with comma')
     parser.add_argument('-o', '--output', default=os.getenv("HOME") + '/Download', type=str,
                         help='Path directory to save file')
