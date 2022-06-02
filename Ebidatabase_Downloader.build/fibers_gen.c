@@ -1,1 +1,0 @@
-/Users/vinhc/opt/anaconda3/envs/env_python2/lib/python2.7/site-packages/nuitka/build/static_src/gen_ucontext_src/fibers_gen.c
