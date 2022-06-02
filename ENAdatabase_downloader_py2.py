@@ -46,7 +46,8 @@ def check_accession_number(accession):
     if is_study(accession) or is_sample(accession) or is_experiment(accession):
         url = VIEW_URL_BASE + XML_DISPLAY + accession
         try:
-            print('Checking availability of ' + url)
+            print
+            'Checking availability of ' + url
             response = requests.get(url)
             tree = xml.etree.ElementTree.fromstring(response.content)
             for child in tree.iter('ID'):
@@ -54,13 +55,15 @@ def check_accession_number(accession):
                     list_accession_number.append(child.text)
             return list_accession_number
         except requests.ConnectionError:
-            print("No data" + accession + "in the database system")
+            print
+            "No data" + accession + "in the database system"
             return -1
     elif is_run(accession):
         return accession
     else:
-        print("Your accession code is not supported. "
-              "Please input another code ([EDS]RR, [EDS]RX, [EDS]RP, PRJ[EDN], SAM[ND], SAMEA, [EDS]RS)")
+        print
+        "Your accession code is not supported. " \
+        "Please input another code ([EDS]RR, [EDS]RX, [EDS]RP, PRJ[EDN], SAM[ND], SAMEA, [EDS]RS)"
         return -1
 
 
@@ -72,7 +75,8 @@ def sub_download(position, file_name, path_save, initial, id_code, accession):
     try:
         ftp.cwd(initial)
     except ftplib.error_perm:
-        print("Error Link. May be accession number had been deleted")
+        print
+        "Error Link. May be accession number had been deleted"
     else:
         try:
             ftp.cwd(id_code)
@@ -95,8 +99,10 @@ def sub_download(position, file_name, path_save, initial, id_code, accession):
 def download_from_ena(accession_code, path_save):
     accession_code_run = check_accession_number(accession_code)
     if accession_code != accession_code_run and accession_code_run != -1:
-        print("Accession Number is Sample Accession Number: " + accession_code)
-        print("Run Accession Number For Downloads: %s" % accession_code_run)
+        print
+        "Accession Number is Sample Accession Number: " + accession_code
+        print
+        "Run Accession Number For Downloads: %s" % accession_code_run
         for accession in accession_code_run:
             initial = accession[0:6]
             id_code = "00" + accession[-1]
@@ -127,8 +133,8 @@ if __name__ == '__main__':
             if extension in ALLOWED_EXTENSIONS:
                 break
             else:
-                print(
-                    'Extension file is not supported. Please input another file (Supported .csv with comma delimited)')
+                print
+                'Extension file is not supported. Please input another file (Supported .csv with comma delimited)'
                 sys.exit(0)
         with open(filename, 'rb') as f:
             file_content = csv.reader(codecs.EncodedFile(f, 'utf-8', 'utf-8-sig'), delimiter=',')
@@ -137,14 +143,16 @@ if __name__ == '__main__':
                     if is_study(i[1]) or is_sample(i[1]) or is_experiment(i[1]) or is_run(i[1]):
                         list_accession.append(i[1])
                     else:
-                        print('Accession Number: ' + i[1] + 'is not supported or wrong format. Please check after '
-                                                            'finish process')
+                        print
+                        'Accession Number: ' + i[1] + 'is not supported or wrong format. Please check after ' \
+                                                      'finish process'
                 else:
                     for j in i:
                         if is_study(j) or is_sample(j) or is_experiment(j) or is_run(j):
                             list_accession.append(j)
                         else:
-                            print('Accession Number: ' + j + 'is not supported or wrong format')
+                            print
+                            'Accession Number: ' + j + 'is not supported or wrong format'
 
     if args.list != '':
         str_accession = args.list
@@ -152,17 +160,22 @@ if __name__ == '__main__':
             if is_study(i) or is_sample(i) or is_experiment(i) or is_run(i):
                 list_accession.append(i)
             else:
-                print('Accession Number: ' + i + ' is not supported or wrong format')
+                print
+                'Accession Number: ' + i + ' is not supported or wrong format'
     if len(list_accession) > 0:
-        print("Please check list accession number for download again")
-        print(list_accession)
-        check = str(input("Do you want continue to download ? [y/n]: "))
+        print
+        "Please check list accession number for download again"
+        print
+        list_accession
+        check = str(raw_input("Do you want continue to download ? [y/n]: "))
         if check in {'yes', 'y', 'Y'}:
             for each_accession in list_accession:
                 download_from_ena(each_accession, args.output)
-            print("Done. See ya!!!! ^_^")
+            print
+            "Done. See ya!!!! ^_^"
         else:
-            print("Thank you")
+            print
+            "Thank you"
             sys.exit(0)
     else:
         parser.print_help()
