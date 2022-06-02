@@ -1,4 +1,5 @@
-import sys
-from cx_Freeze import setup, Executable
-
-setup(name="myProgram", version="0.1", description="", executables=[Executable("ENAdatabase_Downloader_py2.py")])
+from distutils.core import Extension, setup
+from Cython.Build import cythonize
+# define an extension that will be cythonized and compiled
+ext = Extension(name="ENAdatabase_Downloader", sources=["ENAdatabase_Downloader_py2.py"])
+setup(ext_modules=cythonize(ext))
