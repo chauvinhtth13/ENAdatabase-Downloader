@@ -61,9 +61,8 @@ def check_accession_number(accession):
     elif is_run(accession):
         return accession
     else:
-        print
-        "Your accession code is not supported. " \
-        "Please input another code ([EDS]RR, [EDS]RX, [EDS]RP, PRJ[EDN], SAM[ND], SAMEA, [EDS]RS)"
+        print"Your accession code is not supported. " \
+             "Please input another code ([EDS]RR, [EDS]RX, [EDS]RP, PRJ[EDN], SAM[ND], SAMEA, [EDS]RS)"
         return -1
 
 
@@ -143,16 +142,14 @@ if __name__ == '__main__':
                     if is_study(i[1]) or is_sample(i[1]) or is_experiment(i[1]) or is_run(i[1]):
                         list_accession.append(i[1])
                     else:
-                        print
-                        'Accession Number: ' + i[1] + 'is not supported or wrong format. Please check after ' \
-                                                      'finish process'
+                        print'Accession Number: ' + i[1] + "is not supported or wrong format. Please check after " \
+                                                           "finish process"
                 else:
                     for j in i:
                         if is_study(j) or is_sample(j) or is_experiment(j) or is_run(j):
                             list_accession.append(j)
                         else:
-                            print
-                            'Accession Number: ' + j + 'is not supported or wrong format'
+                            print 'Accession Number: ' + j + 'is not supported or wrong format'
 
     if args.list != '':
         str_accession = args.list
@@ -165,8 +162,7 @@ if __name__ == '__main__':
     if len(list_accession) > 0:
         print
         "Please check list accession number for download again"
-        print
-        list_accession
+        print list_accession
         check = str(raw_input("Do you want continue to download ? [y/n]: "))
         if check in {'yes', 'y', 'Y'}:
             for each_accession in list_accession:
