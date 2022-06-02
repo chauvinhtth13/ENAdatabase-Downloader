@@ -86,7 +86,6 @@ def sub_download(position, file_name, path_save, initial, id_code, accession):
                     def cb(data):
                         pbar.update(len(data))
                         file_save.write(data)
-
                     ftp.retrbinary('RETR {}'.format(file_name), cb)
             file_save.close()
     ftp.close()
@@ -113,10 +112,10 @@ if __name__ == '__main__':
                                                  'chauvinhtth13@gmail.com)')
     parser.add_argument('-i', '--ifile', type=str, default='',
                         help='Input list accession number by file (.csv)')
-    parser.add_argument('-l', '--list', type=str, default='',
+    parser.add_argument('-l', '--list', type=str, default='ERS3050782',
                         help='Input list accession number by hand. Format is accession1,...,accessionN. Note: no space '
                              'between accession with comma')
-    parser.add_argument('-o', '--output', default=os.getenv("HOME") + '/Download', type=str,
+    parser.add_argument('-o', '--output', default="/"+os.getenv("HOME") + '/Download', type=str,
                         help='Path directory to save file')
     args = parser.parse_args()
     list_accession = list()
