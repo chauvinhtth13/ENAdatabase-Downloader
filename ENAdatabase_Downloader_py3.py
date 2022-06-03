@@ -5,6 +5,7 @@ import ftplib
 import os
 import re
 import sys
+from tkinter import E
 import xml.etree.ElementTree
 from multiprocessing.pool import ThreadPool
 
@@ -92,6 +93,26 @@ def sub_download(position, file_name, path_save, initial, id_code, accession):
 
 
 def download_from_ena(accession_code, path_save):
+    check_path = os.path.isdir(path_save)
+    while check_path == False:
+        print('Path Folder: '+path_save+' is not exist' )
+        option_path = str(input('You wants create destination directory or input new destination directory ? (Create,[c] | Input,[i]): '))
+        while option_path not in {'c','i'}:
+            option_path = str(input("I think you have some mistake to input wrong character. Please input again (Create,[c] | Input,[i]): "))
+        if option_path in {'c'}:
+            try:
+                os.mkdir(path_save,exist_ok=True)
+            except:
+                print("Can't create destination directory (%s)!" % (path_save))
+                new_path = str(input("Please input your new path: "))
+                path_save = new_path
+            finally:
+                check_path = os.path.isdir(path_save)
+        else:
+            new_path = str(input("Please input your new path: "))
+            path_save = new_path
+            check_path = os.path.isdir(path_save)
+
     accession_code_run = check_accession_number(accession_code)
     if accession_code != accession_code_run and accession_code_run != -1:
         print("Accession Number is Sample Accession Number: " + accession_code)
@@ -115,7 +136,7 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--list', type=str, default='ERS3050782',
                         help='Input list accession number by hand. Format is accession1,...,accessionN. Note: no space '
                              'between accession with comma')
-    parser.add_argument('-o', '--output', default="/"+os.getenv("HOME") + '/Download', type=str,
+    parser.add_argument('-o', '--output', default=os.getenv("HOME") + '/Downloads', type=str,
                         help='Path directory to save file')
     args = parser.parse_args()
     list_accession = list()
@@ -126,8 +147,7 @@ if __name__ == '__main__':
             if extension in ALLOWED_EXTENSIONS:
                 break
             else:
-                print(
-                    'Extension file is not supported. Please input another file (Supported .csv with comma delimited)')
+                print('Extension file is not supported. Please input another file (Supported .csv with comma delimited)')
                 sys.exit(0)
         with open(filename, 'rb') as f:
             file_content = csv.reader(codecs.EncodedFile(f, 'utf-8', 'utf-8-sig'), delimiter=',')
@@ -155,7 +175,9 @@ if __name__ == '__main__':
     if len(list_accession) > 0:
         print("Please check list accession number for download again")
         print(list_accession)
-        check = str(input("Do you want continue to download ? [y/n]: "))
+        check = str(input("Do you want continue to download ? (Yes,[y] | No,[n]): "))
+        while check not in  {'yes', 'y', 'Y', 'no', 'n', 'N'}:
+            check = str(input("I think you have some mistake with input wrong character. Please input again (Yes,[y] | No,[n]): "))
         if check in {'yes', 'y', 'Y'}:
             for each_accession in list_accession:
                 download_from_ena(each_accession, args.output)
