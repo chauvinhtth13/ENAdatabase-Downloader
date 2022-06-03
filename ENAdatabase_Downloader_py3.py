@@ -133,7 +133,7 @@ if __name__ == '__main__':
                                                  'chauvinhtth13@gmail.com)')
     parser.add_argument('-i', '--ifile', type=str, default='',
                         help='Input list accession number by file (.csv)')
-    parser.add_argument('-l', '--list', type=str, default='ERS3050782',
+    parser.add_argument('-l', '--list', type=str, default='',
                         help='Input list accession number by hand. Format is accession1,...,accessionN. Note: no space '
                              'between accession with comma')
     parser.add_argument('-o', '--output', default=os.getenv("HOME") + '/Downloads', type=str,
