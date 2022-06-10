@@ -5,12 +5,10 @@ import ftplib
 import os
 import re
 import sys
-from tkinter import E
 import xml.etree.ElementTree
-from multiprocessing.pool import ThreadPool
-
 import requests
 from tqdm import tqdm
+from multiprocessing import Process
 
 VIEW_URL_BASE = 'https://www.ebi.ac.uk/ena/browser/api/'
 XML_DISPLAY = 'xml/'
@@ -44,8 +42,8 @@ def is_sample(accession):
 
 def check_accession_number(accession):
     list_accession_number = []
-    if is_study(accession) or is_sample(accession) or is_experiment(accession):
-        url = VIEW_URL_BASE + XML_DISPLAY + accession
+    url = VIEW_URL_BASE + XML_DISPLAY + accession
+    if is_sample(accession):
         try:
             print('Checking availability of ' + url)
             response = requests.get(url)
@@ -58,7 +56,24 @@ def check_accession_number(accession):
             print("No data" + accession + "in the database system")
             return -1
     elif is_run(accession):
-        return accession
+        return [accession]
+    elif is_study(accession) or is_experiment(accession):
+        try:
+            print('Checking availability of ' + url)
+            response = requests.get(url)
+            tree = xml.etree.ElementTree.fromstring(response.content)
+            for child in tree.iter('ID'):
+                list_code = re.split('-|,', child.text)
+                if is_run(list_code[0]):
+                    pattern = list_code[0][0:6]
+                    first_id = list_code[0][6:10]
+                    end_id = list_code[1][6:10]
+                    for num_id in range(int(first_id), int(end_id) + 1):
+                        list_accession_number.append(pattern + str(num_id))
+            return list_accession_number
+        except requests.ConnectionError:
+            print("No data" + accession + "in the database system")
+            return -1
     else:
         print("Your accession code is not supported. "
               "Please input another code ([EDS]RR, [EDS]RX, [EDS]RP, PRJ[EDN], SAM[ND], SAMEA, [EDS]RS)")
@@ -82,28 +97,31 @@ def sub_download(position, file_name, path_save, initial, id_code, accession):
             ftp.cwd(accession)
         finally:
             total_size = ftp.size(file_name)
+            print(total_size)
             with open('%s/%s' % (path_save, file_name), 'wb') as file_save:
                 with tqdm(total=total_size, unit='B', unit_scale=True, desc=file_name, position=position) as pbar:
                     def cb(data):
                         pbar.update(len(data))
                         file_save.write(data)
+
                     ftp.retrbinary('RETR {}'.format(file_name), cb)
-            file_save.close()
     ftp.close()
 
 
 def download_from_ena(accession_code, path_save):
     check_path = os.path.isdir(path_save)
-    while check_path == False:
-        print('Path Folder: '+path_save+' is not exist' )
-        option_path = str(input('You wants create destination directory or input new destination directory ? (Create,[c] | Input,[i]): '))
-        while option_path not in {'c','i'}:
-            option_path = str(input("I think you have some mistake to input wrong character. Please input again (Create,[c] | Input,[i]): "))
+    while not check_path:
+        print('Path Folder: ' + path_save + ' is not exist')
+        option_path = str(input('You wants create destination directory or input new destination directory ? (Create,'
+                                '[c] | Input,[i]): '))
+        while option_path not in {'c', 'i'}:
+            option_path = str(input("I think you have some mistake to input wrong character. Please input again ("
+                                    "Create,[c] | Input,[i]): "))
         if option_path in {'c'}:
             try:
-                os.mkdir(path_save,exist_ok=True)
-            except:
-                print("Can't create destination directory (%s)!" % (path_save))
+                os.mkdir(path_save)
+            except FileNotFoundError:
+                print("Can't create destination directory (%s)!" % path_save)
                 new_path = str(input("Please input your new path: "))
                 path_save = new_path
             finally:
@@ -114,18 +132,20 @@ def download_from_ena(accession_code, path_save):
             check_path = os.path.isdir(path_save)
 
     accession_code_run = check_accession_number(accession_code)
-    if accession_code != accession_code_run and accession_code_run != -1:
-        print("Accession Number is Sample Accession Number: " + accession_code)
-        print("Run Accession Number For Downloads: %s" % accession_code_run)
+    if accession_code_run != -1:
+        if accession_code != accession_code_run:
+            print("Run Accession Number For Downloads: %s" % accession_code_run)
         for accession in accession_code_run:
             initial = accession[0:6]
             id_code = "00" + accession[-1]
             list_file_download = ['%s_1.fastq.gz' % accession, '%s_2.fastq.gz' % accession]
-            pool = ThreadPool(2)
+            processes = []
             for position, file_name in enumerate(list_file_download, 1):
-                pool.apply_async(sub_download, args=(position, file_name, path_save, initial, id_code, accession))
-            pool.close()
-            pool.join()
+                pool = Process(target=sub_download, args=(position, file_name, path_save, initial, id_code, accession))
+                pool.start()
+                processes.append(pool)
+            for p in processes:
+                p.join()
 
 
 if __name__ == '__main__':
@@ -140,6 +160,7 @@ if __name__ == '__main__':
                         help='Path directory to save file')
     args = parser.parse_args()
     list_accession = list()
+    list_wrong = list()
     if args.ifile != '':
         while True:
             filename = args.ifile
@@ -147,7 +168,8 @@ if __name__ == '__main__':
             if extension in ALLOWED_EXTENSIONS:
                 break
             else:
-                print('Extension file is not supported. Please input another file (Supported .csv with comma delimited)')
+                print(
+                    'Extension file is not supported. Please input another file (Supported .csv with comma delimited)')
                 sys.exit(0)
         with open(filename, 'rb') as f:
             file_content = csv.reader(codecs.EncodedFile(f, 'utf-8', 'utf-8-sig'), delimiter=',')
@@ -156,14 +178,13 @@ if __name__ == '__main__':
                     if is_study(i[1]) or is_sample(i[1]) or is_experiment(i[1]) or is_run(i[1]):
                         list_accession.append(i[1])
                     else:
-                        print('Accession Number: ' + i[1] + 'is not supported or wrong format. Please check after '
-                                                            'finish process')
+                        list_wrong.append(i[1])
                 else:
                     for j in i:
                         if is_study(j) or is_sample(j) or is_experiment(j) or is_run(j):
                             list_accession.append(j)
                         else:
-                            print('Accession Number: ' + j + 'is not supported or wrong format')
+                            list_wrong.append(j)
 
     if args.list != '':
         str_accession = args.list
@@ -171,13 +192,15 @@ if __name__ == '__main__':
             if is_study(i) or is_sample(i) or is_experiment(i) or is_run(i):
                 list_accession.append(i)
             else:
-                print('Accession Number: ' + i + ' is not supported or wrong format')
+                list_wrong.append(i)
     if len(list_accession) > 0:
         print("Please check list accession number for download again")
-        print(list_accession)
+        print("List accession number will be download: " + str(list_accession))
+        print("List accession number will not be download: " + str(list_wrong))
         check = str(input("Do you want continue to download ? (Yes,[y] | No,[n]): "))
-        while check not in  {'yes', 'y', 'Y', 'no', 'n', 'N'}:
-            check = str(input("I think you have some mistake with input wrong character. Please input again (Yes,[y] | No,[n]): "))
+        while check not in {'yes', 'y', 'Y', 'no', 'n', 'N'}:
+            check = str(input("I think you have some mistake with input wrong character. Please input again (Yes,"
+                              "[y] | No,[n]): "))
         if check in {'yes', 'y', 'Y'}:
             for each_accession in list_accession:
                 download_from_ena(each_accession, args.output)
