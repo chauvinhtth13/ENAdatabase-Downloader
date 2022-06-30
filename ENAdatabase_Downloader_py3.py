@@ -8,7 +8,7 @@ import sys
 import xml.etree.ElementTree
 import requests
 from tqdm import tqdm
-from multiprocessing import Process
+from multiprocessing.dummy import Pool
 
 VIEW_URL_BASE = 'https://www.ebi.ac.uk/ena/browser/api/'
 XML_DISPLAY = 'xml/'
@@ -72,7 +72,7 @@ def check_accession_number(accession):
                         list_accession_number.append(pattern + str(num_id))
             return list_accession_number
         except requests.ConnectionError:
-            print("No data" + accession + "in the database system")
+            print("No data " + accession + " in the database system")
             return -1
     else:
         print("Your accession code is not supported. "
@@ -81,7 +81,11 @@ def check_accession_number(accession):
 
 
 def sub_download(position, file_name, path_save, initial, id_code, accession):
-    ftp = ftplib.FTP('ftp.sra.ebi.ac.uk')
+    try:
+        ftp = ftplib.FTP('ftp.sra.ebi.ac.uk')
+    except ConnectionResetError:
+        print("Connection reset by peer")
+        return
     ftp.login()
     ftp.cwd('vol1')
     ftp.cwd('fastq')
@@ -97,15 +101,12 @@ def sub_download(position, file_name, path_save, initial, id_code, accession):
             ftp.cwd(accession)
         finally:
             total_size = ftp.size(file_name)
-            print(total_size)
             with open('%s/%s' % (path_save, file_name), 'wb') as file_save:
                 with tqdm(total=total_size, unit='B', unit_scale=True, desc=file_name, position=position) as pbar:
                     def cb(data):
                         pbar.update(len(data))
                         file_save.write(data)
-
                     ftp.retrbinary('RETR {}'.format(file_name), cb)
-    ftp.close()
 
 
 def download_from_ena(accession_code, path_save):
@@ -139,13 +140,11 @@ def download_from_ena(accession_code, path_save):
             initial = accession[0:6]
             id_code = "00" + accession[-1]
             list_file_download = ['%s_1.fastq.gz' % accession, '%s_2.fastq.gz' % accession]
-            processes = []
+            pool = Pool(2)
             for position, file_name in enumerate(list_file_download, 1):
-                pool = Process(target=sub_download, args=(position, file_name, path_save, initial, id_code, accession))
-                pool.start()
-                processes.append(pool)
-            for p in processes:
-                p.join()
+                pool.apply_async(sub_download, args=(position, file_name, path_save, initial, id_code, accession))
+            pool.close()
+            pool.join()
 
 
 if __name__ == '__main__':
