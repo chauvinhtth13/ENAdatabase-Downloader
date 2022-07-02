@@ -1,26 +1,26 @@
 import argparse
 import codecs
 import csv
-import ftplib
 import os
 import re
 import sys
-import xml.etree.ElementTree
 import requests
+import urllib.error
+import urllib.request as urlrequest
+import urllib.parse as urlparse
 from tqdm import tqdm
 from multiprocessing.dummy import Pool
 
 VIEW_URL_BASE = 'https://www.ebi.ac.uk/ena/browser/api/'
+PORTAL_SEARCH_BASE = 'https://www.ebi.ac.uk/ena/portal/api/filereport?'
 XML_DISPLAY = 'xml/'
 ALLOWED_EXTENSIONS = {'.csv'}
 
-run_pattern = re.compile('^[EDS]RR[0-9]{6,}$')
-experiment_pattern = re.compile('^[EDS]RX[0-9]{6,}$')
-study_pattern_1 = re.compile('^[EDS]RP[0-9]{6,}$')
-study_pattern_2 = re.compile('^PRJ[EDN][AB][0-9]+$')
-sample_pattern_1 = re.compile('^SAM[ND][0-9]{8}$')
-sample_pattern_2 = re.compile('^SAMEA[0-9]{6,}$')
-sample_pattern_3 = re.compile('^[EDS]RS[0-9]{6,}$')
+run_pattern = re.compile('^[EDS]RR\d{6,}$')
+experiment_pattern = re.compile('^[EDS]RX\d{6,}$')
+sample_pattern_1 = re.compile('^SAM[ND]\d{8}$')
+sample_pattern_2 = re.compile('^SAMEA\d{6,}$')
+sample_pattern_3 = re.compile('^[EDS]RS\d{6,}$')
 
 
 def is_run(accession):
@@ -31,83 +31,98 @@ def is_experiment(accession):
     return experiment_pattern.match(accession)
 
 
-def is_study(accession):
-    return study_pattern_1.match(accession) or study_pattern_2.match(accession)
-
-
 def is_sample(accession):
-    return sample_pattern_1.match(accession) or sample_pattern_2.match(accession) \
-           or sample_pattern_3.match(accession)
+    return sample_pattern_1.match(accession) or sample_pattern_2.match(accession) or sample_pattern_3.match(accession)
 
 
-def check_accession_number(accession):
-    list_accession_number = []
+def get_accession_type(accession):
+    if is_run(accession):
+        return 1
+    elif is_experiment(accession):
+        return 2
+    elif is_sample(accession):
+        return 3
+    return 0
+
+
+def get_file_search_query(accession):
+    return PORTAL_SEARCH_BASE + 'accession={0}'.format(accession) + '&result=read_run&' \
+                                                                    'fields=fastq_ftp,sra_ftp&limit=0'
+
+
+def split_filelist(filelist_string):
+    if filelist_string.strip() == '':
+        return []
+    return filelist_string.strip().split(';')
+
+
+def parse_file_search_result_line(line):
+    cols = line.split('\t')
+    data_acc = cols[0].strip()
+    fastq_filelist = split_filelist(cols[1])
+    sra_filelist = split_filelist(cols[2])
+    return data_acc, fastq_filelist, sra_filelist
+
+
+def get_report_from_portal(url):
+    request = urlrequest.Request(url)
+    response = urlrequest.urlopen(request)
+    if response.status == 200:
+        return response
+    elif response.status == 204:
+        print('ERROR: No records of the requested data group are available associated with the provided accession')
+    else:
+        print('ERROR: ' + response.msg + '\n')
+        print('ERROR: Unable to fetch data from url: ' + url + '\n')
+
+
+def download_report_from_portal(url):
+    response = get_report_from_portal(url)
+    lines = []
+    for line in response:
+        lines.append(line.decode('utf-8'))
+    return lines
+
+
+def is_available(accession):
     url = VIEW_URL_BASE + XML_DISPLAY + accession
-    if is_sample(accession):
-        try:
-            print('Checking availability of ' + url)
-            response = requests.get(url)
-            tree = xml.etree.ElementTree.fromstring(response.content)
-            for child in tree.iter('ID'):
-                if is_run(child.text):
-                    list_accession_number.append(child.text)
-            return list_accession_number
-        except requests.ConnectionError:
-            print("No data" + accession + "in the database system")
-            return -1
-    elif is_run(accession):
-        return [accession]
-    elif is_study(accession) or is_experiment(accession):
-        try:
-            print('Checking availability of ' + url)
-            response = requests.get(url)
-            tree = xml.etree.ElementTree.fromstring(response.content)
-            for child in tree.iter('ID'):
-                list_code = re.split('-|,', child.text)
-                if is_run(list_code[0]):
-                    pattern = list_code[0][0:6]
-                    first_id = list_code[0][6:10]
-                    end_id = list_code[1][6:10]
-                    for num_id in range(int(first_id), int(end_id) + 1):
-                        list_accession_number.append(pattern + str(num_id))
-            return list_accession_number
-        except requests.ConnectionError:
-            print("No data " + accession + " in the database system")
-            return -1
-    else:
-        print("Your accession code is not supported. "
-              "Please input another code ([EDS]RR, [EDS]RX, [EDS]RP, PRJ[EDN], SAM[ND], SAMEA, [EDS]RS)")
+    try:
+        print('Checking availability of ' + url)
+        response = requests.get(url)
+        return response.status_code == 200 and len(response.content) != 0
+    except urllib.error.URLError as e:
+        if 'CERTIFICATE_VERIFY_FAILED' in str(e):
+            print('Error verifying SSL certificate. Have you run "Install Certificates" as part of your Python3 '
+                  'installation?')
+            print('This is a commonly missed step in Python3 installation on a Mac.')
+            print('Please run the following from a terminal window (update to your Python3 version as needed):')
+            print('open "/Applications/Python 3.6/Install Certificates.command"')
+        raise
+
+
+def check_availability(accession):
+    if not is_available(accession):
+        print('ERROR: Record does not exist or is not available for accession provided\n')
         return -1
+    return 1
 
 
-def sub_download(position, file_name, path_save, initial, id_code, accession):
+class DownloadProgressBar(tqdm):
+    def update_to(self, b=1, bsize=1, tsize=None):
+        if tsize is not None:
+            self.total = tsize
+        self.update(b * bsize - self.n)
+
+
+def sub_download(position, ftp_url, path_save):
     try:
-        ftp = ftplib.FTP('ftp.sra.ebi.ac.uk')
-    except ConnectionResetError:
-        print("Connection reset by peer")
-        return
-    ftp.login()
-    ftp.cwd('vol1')
-    ftp.cwd('fastq')
-    try:
-        ftp.cwd(initial)
-    except ftplib.error_perm:
-        print("Error Link. May be accession number had been deleted")
-    else:
-        try:
-            ftp.cwd(id_code)
-            ftp.cwd(accession)
-        except ftplib.error_perm:
-            ftp.cwd(accession)
-        finally:
-            total_size = ftp.size(file_name)
-            with open('%s/%s' % (path_save, file_name), 'wb') as file_save:
-                with tqdm(total=total_size, unit='B', unit_scale=True, desc=file_name, position=position) as pbar:
-                    def cb(data):
-                        pbar.update(len(data))
-                        file_save.write(data)
-                    ftp.retrbinary('RETR {}'.format(file_name), cb)
-
+        file_name = urlparse.unquote(ftp_url.split('/')[-1])
+        dest_file = os.path.join(path_save, file_name)
+        with DownloadProgressBar(unit='B', unit_scale=True, miniters=1, desc=file_name, position = position) as t:
+            urlrequest.urlretrieve("ftp://" + ftp_url, dest_file, reporthook=t.update_to)
+    except Exception as e:
+        print("Error with FTP transfer: {0}".format(e))
+        print("Error with FTP transfer occurred for file: {}".format(file_name))
 
 def download_from_ena(accession_code, path_save):
     check_path = os.path.isdir(path_save)
@@ -132,17 +147,17 @@ def download_from_ena(accession_code, path_save):
             path_save = new_path
             check_path = os.path.isdir(path_save)
 
-    accession_code_run = check_accession_number(accession_code)
-    if accession_code_run != -1:
-        if accession_code != accession_code_run:
-            print("Run Accession Number For Downloads: %s" % accession_code_run)
-        for accession in accession_code_run:
-            initial = accession[0:6]
-            id_code = "00" + accession[-1]
-            list_file_download = ['%s_1.fastq.gz' % accession, '%s_2.fastq.gz' % accession]
-            pool = Pool(2)
-            for position, file_name in enumerate(list_file_download, 1):
-                pool.apply_async(sub_download, args=(position, file_name, path_save, initial, id_code, accession))
+    check_code = check_availability(accession_code)
+    if check_code != -1:
+        print("Checking availability: Done")
+        search_url = get_file_search_query(accession_code)
+        print("Get data from: " + search_url)
+        lines = download_report_from_portal(search_url)
+        for line in lines[1:]:
+            data_accession, ftp_list, sra_list = parse_file_search_result_line(line)
+            for position, ftp_url in enumerate(ftp_list, 1):
+                pool = Pool(len(ftp_list))
+                pool.apply_async(sub_download, args=(position, ftp_url, path_save))
             pool.close()
             pool.join()
 
@@ -174,13 +189,13 @@ if __name__ == '__main__':
             file_content = csv.reader(codecs.EncodedFile(f, 'utf-8', 'utf-8-sig'), delimiter=',')
             for i in file_content:
                 if len(i) == 1:
-                    if is_study(i[1]) or is_sample(i[1]) or is_experiment(i[1]) or is_run(i[1]):
+                    if get_accession_type(i) != 0:
                         list_accession.append(i[1])
                     else:
                         list_wrong.append(i[1])
                 else:
                     for j in i:
-                        if is_study(j) or is_sample(j) or is_experiment(j) or is_run(j):
+                        if get_accession_type(i) != 0:
                             list_accession.append(j)
                         else:
                             list_wrong.append(j)
@@ -188,7 +203,7 @@ if __name__ == '__main__':
     if args.list != '':
         str_accession = args.list
         for i in str_accession.split(','):
-            if is_study(i) or is_sample(i) or is_experiment(i) or is_run(i):
+            if get_accession_type(i) != 0:
                 list_accession.append(i)
             else:
                 list_wrong.append(i)
