@@ -155,8 +155,8 @@ def download_from_ena(accession_code, path_save):
         lines = download_report_from_portal(search_url)
         for line in lines[1:]:
             data_accession, ftp_list, sra_list = parse_file_search_result_line(line)
+            pool = ThreadPool(len(ftp_list))
             for position, ftp_url in enumerate(ftp_list, 1):
-                pool = ThreadPool(len(ftp_list))
                 pool.apply_async(sub_download, args=(position, ftp_url, path_save))
             pool.close()
             pool.join()
