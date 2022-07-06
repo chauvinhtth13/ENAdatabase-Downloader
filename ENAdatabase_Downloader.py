@@ -8,7 +8,7 @@ import urllib.error
 import urllib.request as urlrequest
 import urllib.parse as urlparse
 from tqdm import tqdm
-from multiprocessing.dummy import Pool
+from multiprocessing.pool import ThreadPool
 
 VIEW_URL_BASE = 'https://www.ebi.ac.uk/ena/browser/api/'
 PORTAL_SEARCH_BASE = 'https://www.ebi.ac.uk/ena/portal/api/filereport?'
@@ -123,6 +123,7 @@ def sub_download(position, ftp_url, path_save):
         print("Error with FTP transfer: {0}".format(e))
         print("Error with FTP transfer occurred for file: {}".format(file_name))
 
+
 def download_from_ena(accession_code, path_save):
     check_path = os.path.isdir(path_save)
     while not check_path:
@@ -155,7 +156,7 @@ def download_from_ena(accession_code, path_save):
         for line in lines[1:]:
             data_accession, ftp_list, sra_list = parse_file_search_result_line(line)
             for position, ftp_url in enumerate(ftp_list, 1):
-                pool = Pool(len(ftp_list))
+                pool = ThreadPool(len(ftp_list))
                 pool.apply_async(sub_download, args=(position, ftp_url, path_save))
             pool.close()
             pool.join()
