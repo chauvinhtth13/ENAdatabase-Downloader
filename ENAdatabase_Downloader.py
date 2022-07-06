@@ -185,8 +185,8 @@ if __name__ == '__main__':
                 print(
                     'Extension file is not supported. Please input another file (Supported .csv with comma delimited)')
                 sys.exit(0)
-        with open(filename, 'rb') as f:
-            file_content = csv.reader(codecs.EncodedFile(f, 'utf-8', 'utf-8-sig'), delimiter=',')
+        with open(filename, 'rt', encoding='utf-8-sig') as f:
+            file_content = csv.reader(f, delimiter=',')
             for i in file_content:
                 if len(i) == 1:
                     if get_accession_type(i) != 0:
