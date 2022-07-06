@@ -8,7 +8,9 @@ import urllib.error
 import urllib.request as urlrequest
 import urllib.parse as urlparse
 from tqdm import tqdm
-from multiprocessing.pool import ThreadPool
+#from multiprocessing.dummy import Pool as ThreadPool
+import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
 
 VIEW_URL_BASE = 'https://www.ebi.ac.uk/ena/browser/api/'
 PORTAL_SEARCH_BASE = 'https://www.ebi.ac.uk/ena/portal/api/filereport?'
@@ -155,11 +157,27 @@ def download_from_ena(accession_code, path_save):
         lines = download_report_from_portal(search_url)
         for line in lines[1:]:
             data_accession, ftp_list, sra_list = parse_file_search_result_line(line)
-            pool = ThreadPool(len(ftp_list))
-            for position, ftp_url in enumerate(ftp_list, 1):
-                pool.apply_async(sub_download, args=(position, ftp_url, path_save))
-            pool.close()
-            pool.join()
+            # pool = ThreadPool(len(ftp_list))
+            with ThreadPoolExecutor() as executor:
+                futures = []
+                for position, ftp_url in enumerate(ftp_list, 1):
+                    futures.append(
+                        executor.submit(
+                            sub_download, position=position, ftp_url=ftp_url, path_save=path_save
+                        )
+                    )
+                for future in concurrent.futures.as_completed(futures):
+                    try:
+                        print(future.result())
+                    except requests.ConnectTimeout:
+                        print("ConnectTimeout.")
+
+
+
+            #     pool.apply_async(sub_download, args=(position, ftp_url, path_save))
+            # pool.close()
+            # pool.join()
+
 
 
 if __name__ == '__main__':
