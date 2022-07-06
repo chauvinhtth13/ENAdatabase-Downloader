@@ -1,5 +1,4 @@
 import argparse
-import codecs
 import csv
 import os
 import re
@@ -189,10 +188,10 @@ if __name__ == '__main__':
             file_content = csv.reader(f, delimiter=',')
             for i in file_content:
                 if len(i) == 1:
-                    if get_accession_type(i) != 0:
-                        list_accession.append(i[1])
+                    if get_accession_type(i[0]) != 0:
+                        list_accession.append(i[0])
                     else:
-                        list_wrong.append(i[1])
+                        list_wrong.append(i[0])
                 else:
                     for j in i:
                         if get_accession_type(i) != 0:
