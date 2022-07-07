@@ -8,9 +8,7 @@ import urllib.error
 import urllib.request as urlrequest
 import urllib.parse as urlparse
 from tqdm import tqdm
-#from multiprocessing.dummy import Pool as ThreadPool
-import concurrent.futures
-from concurrent.futures import ThreadPoolExecutor
+from multiprocessing.pool import ThreadPool
 
 VIEW_URL_BASE = 'https://www.ebi.ac.uk/ena/browser/api/'
 PORTAL_SEARCH_BASE = 'https://www.ebi.ac.uk/ena/portal/api/filereport?'
@@ -48,7 +46,7 @@ def get_accession_type(accession):
 
 def get_file_search_query(accession):
     return PORTAL_SEARCH_BASE + 'accession={0}'.format(accession) + '&result=read_run&' \
-                                                                    'fields=fastq_ftp,sra_ftp&limit=0'
+                                                                    'fields=submitted_ftp,fastq_ftp,sra_ftp&limit=0'
 
 
 def split_filelist(filelist_string):
@@ -60,9 +58,15 @@ def split_filelist(filelist_string):
 def parse_file_search_result_line(line):
     cols = line.split('\t')
     data_acc = cols[0].strip()
-    fastq_filelist = split_filelist(cols[1])
-    sra_filelist = split_filelist(cols[2])
-    return data_acc, fastq_filelist, sra_filelist
+    submitted_ftp = split_filelist(cols[1])
+    fastq_filelist = split_filelist(cols[2])
+    sra_filelist = split_filelist(cols[3])
+    if not fastq_filelist:
+        if not submitted_ftp:
+            return data_acc, sra_filelist
+        if not sra_filelist:
+            return data_acc, submitted_ftp
+    return data_acc, fastq_filelist
 
 
 def get_report_from_portal(url):
@@ -156,28 +160,12 @@ def download_from_ena(accession_code, path_save):
         print("Get data from: " + search_url)
         lines = download_report_from_portal(search_url)
         for line in lines[1:]:
-            data_accession, ftp_list, sra_list = parse_file_search_result_line(line)
-            # pool = ThreadPool(len(ftp_list))
-            with ThreadPoolExecutor() as executor:
-                futures = []
-                for position, ftp_url in enumerate(ftp_list, 1):
-                    futures.append(
-                        executor.submit(
-                            sub_download, position=position, ftp_url=ftp_url, path_save=path_save
-                        )
-                    )
-                for future in concurrent.futures.as_completed(futures):
-                    try:
-                        print(future.result())
-                    except requests.ConnectTimeout:
-                        print("ConnectTimeout.")
-
-
-
-            #     pool.apply_async(sub_download, args=(position, ftp_url, path_save))
-            # pool.close()
-            # pool.join()
-
+            data_accession, ftp_list = parse_file_search_result_line(line)
+            pool = ThreadPool(len(ftp_list))
+            for position, ftp_url in enumerate(ftp_list, 1):
+                pool.apply_async(sub_download, args=(position, ftp_url, path_save))
+            pool.close()
+            pool.join()
 
 
 if __name__ == '__main__':
