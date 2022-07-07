@@ -8,7 +8,8 @@ import urllib.error
 import urllib.request as urlrequest
 import urllib.parse as urlparse
 from tqdm import tqdm
-from multiprocessing.dummy import Pool
+from multiprocessing.pool import ThreadPool
+import threading
 
 VIEW_URL_BASE = 'https://www.ebi.ac.uk/ena/browser/api/'
 PORTAL_SEARCH_BASE = 'https://www.ebi.ac.uk/ena/portal/api/filereport?'
@@ -119,12 +120,15 @@ class DownloadProgressBar(tqdm):
         self.update(b * bsize - self.n)
 
 
-def sub_download(position, ftp_url, path_save):
+def sub_download(lock, position, ftp_url, path_save):
+    file_name = urlparse.unquote(ftp_url.split('/')[-1])
+    dest_file = os.path.join(path_save, file_name)
     try:
-        file_name = urlparse.unquote(ftp_url.split('/')[-1])
-        dest_file = os.path.join(path_save, file_name)
-        with DownloadProgressBar(unit='B', unit_scale=True, miniters=1, desc=file_name, position = position) as t:
-            urlrequest.urlretrieve("ftp://" + ftp_url, dest_file, reporthook=t.update_to)
+        with lock:
+            with DownloadProgressBar(unit='B', unit_scale=True, miniters=1, desc=file_name, position=position) as t:
+                urlrequest.urlretrieve("ftp://" + ftp_url, dest_file, reporthook=t.update_to)
+        with lock:
+            t.close()
     except Exception as e:
         print("Error with FTP transfer: {0}".format(e))
         print("Error with FTP transfer occurred for file: {}".format(file_name))
@@ -161,9 +165,10 @@ def download_from_ena(accession_code, path_save):
         lines = download_report_from_portal(search_url)
         for line in lines[1:]:
             data_accession, ftp_list = parse_file_search_result_line(line)
-            pool = Pool(len(ftp_list))
+            lock = threading.Lock()
+            pool = ThreadPool(len(ftp_list))
             for position, ftp_url in enumerate(ftp_list, 1):
-                pool.apply_async(sub_download, args=(position, ftp_url, path_save))
+                pool.apply_async(sub_download, args=(lock, position, ftp_url, path_save))
             pool.close()
             pool.join()
 
