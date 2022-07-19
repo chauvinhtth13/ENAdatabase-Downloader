@@ -47,7 +47,13 @@ def get_accession_type(accession):
 
 def get_file_search_query(accession):
     return PORTAL_SEARCH_BASE + 'accession={0}'.format(accession) + '&result=read_run&' \
-                                                                    'fields=submitted_ftp,fastq_ftp,sra_ftp&limit=0'
+                                                                    'fields=study_accession,sample_accession,' \
+                                                                    'experiment_accession,run_accession,' \
+                                                                    'submission_accession,tax_id,scientific_name,' \
+                                                                    'instrument_model,library_name,library_layout,' \
+                                                                    'library_source,read_count,' \
+                                                                    'first_public,study_alias,fastq_ftp,' \
+                                                                    'submitted_ftp,sra_ftp&limit=0'
 
 
 def split_filelist(filelist_string):
@@ -58,16 +64,15 @@ def split_filelist(filelist_string):
 
 def parse_file_search_result_line(line):
     cols = line.split('\t')
-    data_acc = cols[0].strip()
-    submitted_ftp = split_filelist(cols[1])
-    fastq_filelist = split_filelist(cols[2])
-    sra_filelist = split_filelist(cols[3])
+    fastq_filelist = split_filelist(cols[14])
+    submitted_ftp = split_filelist(cols[15])
+    sra_filelist = split_filelist(cols[16])
     if not fastq_filelist:
         if not submitted_ftp:
-            return data_acc, sra_filelist
+            return cols[0:14], sra_filelist
         if not sra_filelist:
-            return data_acc, submitted_ftp
-    return data_acc, fastq_filelist
+            return cols[0:14], submitted_ftp
+    return cols[0:14], fastq_filelist
 
 
 def get_report_from_portal(url):
@@ -100,7 +105,7 @@ def is_available(accession):
         if 'CERTIFICATE_VERIFY_FAILED' in str(e):
             print('Error verifying SSL certificate. Have you run "Install Certificates" as part of your Python3 '
                   'installation?')
-            print('This is a commonly missed step in Python3 installation on a Mac.')
+            print('This is a commonly missed step in Python3 installation on a System.')
             print('Please run the following from a terminal window (update to your Python3 version as needed):')
             print('open "/Applications/Python 3.6/Install Certificates.command"')
         raise
@@ -111,6 +116,27 @@ def check_availability(accession):
         print('ERROR: Record does not exist or is not available for accession provided\n')
         return -1
     return 1
+
+
+def get_meta_data_from_xml(accession):
+    url = "https://www.ncbi.nlm.nih.gov/biosample/?term=" + accession + "&report=full&format=text"
+    request = urlrequest.Request(url)
+    response = urlrequest.urlopen(request)
+    result = ["", "", "", "", ""]
+    for line in response:
+        line_decode = line.decode('utf-8')
+        line_split = line_decode.split("=")
+        if line_split[0].strip() == "/collection date":
+            result[0] = line_split[1].strip()
+        if line_split[0].strip() == "/geographic location":
+            result[1] = line_split[1].strip()
+        if line_split[0].strip() == "/host":
+            result[2] = line_split[1].strip()
+        if line_split[0].strip() == "host_disease":
+            result[3] = line_split[1].strip()
+        if line_split[0].strip() == "/isolation source":
+            result[4] = line_split[1].strip()
+    return result
 
 
 class DownloadProgressBar(tqdm):
@@ -134,7 +160,7 @@ def sub_download(lock, position, ftp_url, path_save):
         print("Error with FTP transfer occurred for file: {}".format(file_name))
 
 
-def download_from_ena(accession_code, path_save):
+def download_from_ena(accession_code, path_save, option):
     check_path = os.path.isdir(path_save)
     while not check_path:
         print('Path Folder: ' + path_save + ' is not exist')
@@ -156,33 +182,43 @@ def download_from_ena(accession_code, path_save):
             new_path = str(input("Please input your new path: "))
             path_save = new_path
             check_path = os.path.isdir(path_save)
-
     check_code = check_availability(accession_code)
+    metadata = list()
     if check_code != -1:
         print("Checking availability: Done")
         search_url = get_file_search_query(accession_code)
         print("Get data from: " + search_url)
         lines = download_report_from_portal(search_url)
         for line in lines[1:]:
-            data_accession, ftp_list = parse_file_search_result_line(line)
-            lock = threading.Lock()
-            pool = ThreadPool(len(ftp_list))
-            for position, ftp_url in enumerate(ftp_list, 1):
-                pool.apply_async(sub_download, args=(lock, position, ftp_url, path_save))
-            pool.close()
-            pool.join()
+            meta_data_report, ftp_list = parse_file_search_result_line(line)
+            meta_data_xml = get_meta_data_from_xml(meta_data_report[1])
+            meta_data_report.extend(meta_data_xml)
+            metadata.append(meta_data_report)
+            if option != 1:
+                lock = threading.Lock()
+                pool = ThreadPool(len(ftp_list))
+                for position, ftp_url in enumerate(ftp_list, 1):
+                    pool.apply_async(sub_download, args=(lock, position, ftp_url, path_save))
+                pool.close()
+                pool.join()
+        print("Get data: Done")
+    return metadata
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Download Fastq on ENA database. Make by Vinh Chau ('
                                                  'chauvinhtth13@gmail.com)')
-    parser.add_argument('-i', '--ifile', type=str, default='',
+    parser.add_argument('-if', '--ifile', type=str, default='',
                         help='Input list accession number by file (.csv)')
-    parser.add_argument('-l', '--list', type=str, default='',
+    parser.add_argument('-il', '--list', type=str, default='',
                         help='Input list accession number by hand. Format is accession1,...,accessionN. Note: no space '
                              'between accession with comma')
     parser.add_argument('-o', '--output', default=os.getenv("HOME") + '/Downloads', type=str,
                         help='Path directory to save file')
+    parser.add_argument('-op', '--download_option', default=0, type=int,
+                        help='0: Default Download Metadata and Fastq file \n '
+                             '1: Download Only Metafile \n'
+                             '2: Download Only Fastq file ')
     args = parser.parse_args()
     list_accession = list()
     list_wrong = list()
@@ -227,11 +263,21 @@ if __name__ == '__main__':
             check = str(input("I think you have some mistake with input wrong character. Please input again (Yes,"
                               "[y] | No,[n]): "))
         if check in {'yes', 'y', 'Y'}:
+            full_metadata = [['study_accession', 'sample_accession', 'experiment_accession', 'run_accession',
+                              'submission_accession', 'tax_id', 'scientific_name', 'instrument_model',
+                              'library_name', 'library_layout', 'library_source', 'read_count', 'first_public',
+                              'study_alias', 'collection_date', 'geographic_location', 'host', 'host_disease',
+                              'isolation_source']]
             for each_accession in list_accession:
-                download_from_ena(each_accession, args.output)
-            print("Done. See ya!!!! ^_^")
+                each_metadata = download_from_ena(each_accession, args.output, args.download_option)
+                full_metadata.extend(each_metadata)
+            if args.download_option != 2:
+                with open(os.path.join(args.output, "metadata.csv"), 'w') as f:
+                    fc = csv.writer(f, lineterminator='\n')
+                    fc.writerows(full_metadata)
+            print("Done. See ya!!!! ^_^.")
         else:
-            print("Thank you")
+            print("Thank you. Bye!! T_T ")
             sys.exit(0)
     else:
         parser.print_help()
