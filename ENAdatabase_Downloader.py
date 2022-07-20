@@ -9,7 +9,6 @@ import urllib.request as urlrequest
 import urllib.parse as urlparse
 from tqdm import tqdm
 from multiprocessing.pool import ThreadPool
-import threading
 
 VIEW_URL_BASE = 'https://www.ebi.ac.uk/ena/browser/api/'
 PORTAL_SEARCH_BASE = 'https://www.ebi.ac.uk/ena/portal/api/filereport?'
@@ -95,27 +94,14 @@ def download_report_from_portal(url):
     return lines
 
 
-def is_available(accession):
+def check_availability(accession):
     url = VIEW_URL_BASE + XML_DISPLAY + accession
     try:
         print('Checking availability of ' + url)
-        response = requests.get(url)
-        return response.status_code == 200 and len(response.content) != 0
+        requests.get(url)
+        return 1
     except urllib.error.URLError as e:
-        if 'CERTIFICATE_VERIFY_FAILED' in str(e):
-            print('Error verifying SSL certificate. Have you run "Install Certificates" as part of your Python3 '
-                  'installation?')
-            print('This is a commonly missed step in Python3 installation on a System.')
-            print('Please run the following from a terminal window (update to your Python3 version as needed):')
-            print('open "/Applications/Python 3.6/Install Certificates.command"')
-        raise
-
-
-def check_availability(accession):
-    if not is_available(accession):
-        print('ERROR: Record does not exist or is not available for accession provided\n')
         return -1
-    return 1
 
 
 def get_meta_data_from_xml(accession):
@@ -146,18 +132,22 @@ class DownloadProgressBar(tqdm):
         self.update(b * bsize - self.n)
 
 
-def sub_download(lock, position, ftp_url, path_save):
+def sub_download(position, ftp_url, path_save):
     file_name = urlparse.unquote(ftp_url.split('/')[-1])
     dest_file = os.path.join(path_save, file_name)
     try:
-        with lock:
-            with DownloadProgressBar(unit='B', unit_scale=True, miniters=1, desc=file_name, position=position) as t:
-                urlrequest.urlretrieve("https://" + ftp_url, dest_file, reporthook=t.update_to)
-        with lock:
-            t.close()
+        with DownloadProgressBar(unit='B', unit_scale=True, miniters=1, desc=file_name, position=position) as t:
+            urlrequest.urlretrieve("https://" + ftp_url, dest_file, reporthook=t.update_to)
     except Exception as e:
-        print("Error with FTP transfer: {0}".format(e))
-        print("Error with FTP transfer occurred for file: {}".format(file_name))
+        print("Error with HTTPS transfer: {0}".format(e))
+        print("Error with HTTPS transfer occurred for file: {}".format(file_name))
+    else:
+        try:
+            with DownloadProgressBar(unit='B', unit_scale=True, miniters=1, desc=file_name, position=position) as t:
+                urlrequest.urlretrieve("ftp://" + ftp_url, dest_file, reporthook=t.update_to)
+        except Exception as e:
+            print("Error with FTP transfer: {0}".format(e))
+            print("Error with FTP transfer occurred for file: {}".format(file_name))
 
 
 def download_from_ena(accession_code, path_save, option):
@@ -191,22 +181,19 @@ def download_from_ena(accession_code, path_save, option):
         lines = download_report_from_portal(search_url)
         for line in lines[1:]:
             meta_data_report, ftp_list = parse_file_search_result_line(line)
+            if option != 1:
+                pool = ThreadPool(len(ftp_list))
+                pool.starmap(sub_download, zip([1, 2], ftp_list, [path_save] * len(ftp_list)))
+                # for position, ftp_url in enumerate(ftp_list, 1):
+                #     pool.apply_async(sub_download, args=(position, ftp_url, path_save))
+                pool.close()
+                pool.join()
             meta_data_xml = get_meta_data_from_xml(meta_data_report[1])
             meta_data_report.extend(meta_data_xml)
             metadata.append(meta_data_report)
-            if option != 1:
-                lock = threading.Lock()
-                full_arg = list()
-                for position, ftp_url in enumerate(ftp_list, 1):
-                    n_arg = (lock, position, ftp_url, path_save)
-                    full_arg.append(n_arg)
-                with ThreadPool(len(ftp_list)) as pool:
-                    pool.starmap(sub_download, full_arg)
-                # for position, ftp_url in enumerate(ftp_list, 1):
-                #     pool.apply_async(sub_download, args=(lock, position, ftp_url, path_save))
-                #pool.close()
-                #pool.join()
         print("Get data: Done")
+    else:
+        print('ERROR: Record does not exist or is not available for accession provided\n')
     return metadata
 
 
@@ -259,6 +246,7 @@ if __name__ == '__main__':
                 list_accession.append(i)
             else:
                 list_wrong.append(i)
+
     if len(list_accession) > 0:
         print("Please check list accession number for download again")
         print("List accession number will be download: " + str(list_accession))
