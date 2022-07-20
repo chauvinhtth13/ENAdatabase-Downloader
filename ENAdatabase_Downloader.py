@@ -152,7 +152,7 @@ def sub_download(lock, position, ftp_url, path_save):
     try:
         with lock:
             with DownloadProgressBar(unit='B', unit_scale=True, miniters=1, desc=file_name, position=position) as t:
-                urlrequest.urlretrieve("ftp://" + ftp_url, dest_file, reporthook=t.update_to)
+                urlrequest.urlretrieve("https://" + ftp_url, dest_file, reporthook=t.update_to)
         with lock:
             t.close()
     except Exception as e:
@@ -196,11 +196,16 @@ def download_from_ena(accession_code, path_save, option):
             metadata.append(meta_data_report)
             if option != 1:
                 lock = threading.Lock()
-                pool = ThreadPool(len(ftp_list))
+                full_arg = list()
                 for position, ftp_url in enumerate(ftp_list, 1):
-                    pool.apply_async(sub_download, args=(lock, position, ftp_url, path_save))
-                pool.close()
-                pool.join()
+                    n_arg = (lock, position, ftp_url, path_save)
+                    full_arg.append(n_arg)
+                with ThreadPool(len(ftp_list)) as pool:
+                    pool.starmap(sub_download, full_arg)
+                # for position, ftp_url in enumerate(ftp_list, 1):
+                #     pool.apply_async(sub_download, args=(lock, position, ftp_url, path_save))
+                #pool.close()
+                #pool.join()
         print("Get data: Done")
     return metadata
 
