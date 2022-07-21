@@ -8,8 +8,8 @@ import urllib.parse as urlparse
 import urllib.request as urlrequest
 import requests
 import wget
-from multiprocessing.dummy import Pool
-from tqdm.auto import tqdm
+#from multiprocessing.dummy import Pool
+#from tqdm.auto import tqdm
 
 
 VIEW_URL_BASE = 'https://www.ebi.ac.uk/ena/browser/api/'
@@ -130,35 +130,37 @@ def get_meta_data_from_xml(accession):
     return result
 
 
-class DownloadProgressBar(tqdm):
-    def __init__(self, iterable=None, *nargs, **kwargs):
-        super().__init__(iterable, nargs, kwargs)
-        self.total = None
-
-    def update_to(self, b=1, bsize=1, tsize=None):
-        if tsize is not None:
-            self.total = tsize
-        self.update(b * bsize - self.n)
+# class DownloadProgressBar(tqdm):
+#     def __init__(self, iterable=None, *nargs, **kwargs):
+#         super().__init__(iterable, nargs, kwargs)
+#         self.total = None
+#
+#     def update_to(self, b=1, bsize=1, tsize=None):
+#         if tsize is not None:
+#             self.total = tsize
+#         self.update(b * bsize - self.n)
 
 
 def sub_download(position, ftp_url, path_save):
     file_name = urlparse.unquote(ftp_url.split('/')[-1])
     dest_file = os.path.join(path_save, file_name)
     try:
-        #print(file_name)
-        #wget.download(url="ftp://" + ftp_url, out=dest_file, bar=wget.bar_adaptive)
-        with DownloadProgressBar(unit='B', unit_scale=True,
-                                 desc=file_name, position=position, ascii=" >") as t:
-            urlrequest.urlretrieve("ftp://" + ftp_url, dest_file, reporthook=t.update_to)
-    except urllib.error.URLError:
+        print(file_name)
+        wget.download(url="ftp://" + ftp_url, out=dest_file, bar=wget.bar_adaptive)
+        # with DownloadProgressBar(unit='B', unit_scale=True,
+        #                          desc=file_name, position=position, ascii=" >") as t:
+        #     urlrequest.urlretrieve("ftp://" + ftp_url, dest_file, reporthook=t.update_to)
+    except Exception as e:
+        print(e)
         print("Error with FTP transfer occurred for file: {}".format(file_name))
         try:
-            # print(file_name)
-            # wget.download(url="https://" + ftp_url, out=dest_file, bar=wget.bar_adaptive)
-            with DownloadProgressBar(unit='B', unit_scale=True,
-                                     desc=file_name, position=position, ascii=" >") as t:
-                urlrequest.urlretrieve("https://" + ftp_url, dest_file, reporthook=t.update_to)
-        except urllib.error.URLError:
+            print(file_name)
+            wget.download(url="https://" + ftp_url, out=dest_file, bar=wget.bar_adaptive)
+            # with DownloadProgressBar(unit='B', unit_scale=True,
+            #                          desc=file_name, position=position, ascii=" >") as t:
+            #     urlrequest.urlretrieve("https://" + ftp_url, dest_file, reporthook=t.update_to)
+        except Exception as e:
+            print(e)
             print("Error with HTTPS transfer occurred for file: {}".format(file_name))
 
 
@@ -194,10 +196,12 @@ def download_from_ena(accession_code, path_save, option):
         for line in lines[1:]:
             meta_data_report, ftp_list = parse_file_search_result_line(line)
             if option != 1:
-                pool = Pool(len(ftp_list))
-                pool.starmap(sub_download, zip([1, 2], ftp_list, [path_save] * len(ftp_list)))
-                pool.close()
-                pool.join()
+                for ftp_url in ftp_list:
+                    sub_download(1, ftp_url, path_save)
+                # pool = Pool(len(ftp_list))
+                # pool.starmap(sub_download, zip([1, 2], ftp_list, [path_save] * len(ftp_list)))
+                # pool.close()
+                # pool.join()
             meta_data_xml = get_meta_data_from_xml(meta_data_report[1])
             meta_data_report.extend(meta_data_xml)
             metadata.append(meta_data_report)
