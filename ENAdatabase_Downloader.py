@@ -2,13 +2,13 @@ import argparse
 import csv
 import os
 import re
-import socket
 import sys
 import urllib.error
 import urllib.parse as urlparse
 import urllib.request as urlrequest
 import requests
-from multiprocessing.pool import ThreadPool
+import wget
+from multiprocessing.dummy import Pool
 from tqdm.auto import tqdm
 
 
@@ -145,16 +145,22 @@ def sub_download(position, ftp_url, path_save):
     file_name = urlparse.unquote(ftp_url.split('/')[-1])
     dest_file = os.path.join(path_save, file_name)
     try:
+        #print(file_name)
+        #wget.download(url="ftp://" + ftp_url, out=dest_file, bar=wget.bar_adaptive)
         with DownloadProgressBar(unit='B', unit_scale=True,
                                  desc=file_name, position=position, ascii=" >") as t:
             urlrequest.urlretrieve("ftp://" + ftp_url, dest_file, reporthook=t.update_to)
-    except urllib.error.URLError:
+    except Exception as e:
+        print("Error failed: {}", e)
         print("Error with FTP transfer occurred for file: {}".format(file_name))
         try:
+            # print(file_name)
+            # wget.download(url="https://" + ftp_url, out=dest_file, bar=wget.bar_adaptive)
             with DownloadProgressBar(unit='B', unit_scale=True,
                                      desc=file_name, position=position, ascii=" >") as t:
                 urlrequest.urlretrieve("https://" + ftp_url, dest_file, reporthook=t.update_to)
-        except urllib.error.URLError:
+        except Exception as e:
+            print("Error failed: {}", e)
             print("Error with HTTPS transfer occurred for file: {}".format(file_name))
 
 
@@ -190,7 +196,7 @@ def download_from_ena(accession_code, path_save, option):
         for line in lines[1:]:
             meta_data_report, ftp_list = parse_file_search_result_line(line)
             if option != 1:
-                pool = ThreadPool(len(ftp_list))
+                pool = Pool(len(ftp_list))
                 pool.starmap(sub_download, zip([1, 2], ftp_list, [path_save] * len(ftp_list)))
                 pool.close()
                 pool.join()
