@@ -188,11 +188,6 @@ def download_from_ena(accession_code, path_save, option):
         for line in lines[1:]:
             meta_data_report, ftp_list = parse_file_search_result_line(line)
             if option != 1:
-                # for para in zip([1, 2], ftp_list, [path_save] * len(ftp_list)):
-                #     _thread.start_new_thread(sub_download, para)
-                # executor = ThreadPoolExecutor(max_workers=len(ftp_list))
-                # future = executor.submit(sub_download, [1, 2], ftp_list, [path_save] * len(ftp_list))
-                # print(future.done())
                 pool = ThreadPool(len(ftp_list))
                 pool.starmap(sub_download, zip([1, 2], ftp_list, [path_save] * len(ftp_list)))
                 pool.close()
