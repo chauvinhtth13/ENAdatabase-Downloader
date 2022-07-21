@@ -7,8 +7,9 @@ import requests
 import urllib.error
 import urllib.request as urlrequest
 import urllib.parse as urlparse
+import socket
 from tqdm import tqdm
-from multiprocessing.pool import ThreadPool
+from multiprocessing.dummy import Pool
 
 VIEW_URL_BASE = 'https://www.ebi.ac.uk/ena/browser/api/'
 PORTAL_SEARCH_BASE = 'https://www.ebi.ac.uk/ena/portal/api/filereport?'
@@ -137,17 +138,14 @@ def sub_download(position, ftp_url, path_save):
     dest_file = os.path.join(path_save, file_name)
     try:
         with DownloadProgressBar(unit='B', unit_scale=True, miniters=1, desc=file_name, position=position) as t:
-            urlrequest.urlretrieve("https://" + ftp_url, dest_file, reporthook=t.update_to)
-    except Exception as e:
-        print("Error with HTTPS transfer: {0}".format(e))
-        print("Error with HTTPS transfer occurred for file: {}".format(file_name))
-    else:
+            urlrequest.urlretrieve("ftp://" + ftp_url, dest_file, reporthook=t.update_to)
+    except urllib.error.URLError:
+        print("Error with FTP transfer occurred for file: {}".format(file_name))
         try:
             with DownloadProgressBar(unit='B', unit_scale=True, miniters=1, desc=file_name, position=position) as t:
-                urlrequest.urlretrieve("ftp://" + ftp_url, dest_file, reporthook=t.update_to)
-        except Exception as e:
-            print("Error with FTP transfer: {0}".format(e))
-            print("Error with FTP transfer occurred for file: {}".format(file_name))
+                urlrequest.urlretrieve("https://" + ftp_url, dest_file, reporthook=t.update_to)
+        except urllib.error.URLError:
+            print("Error with HTTPS transfer occurred for file: {}".format(file_name))
 
 
 def download_from_ena(accession_code, path_save, option):
@@ -182,10 +180,8 @@ def download_from_ena(accession_code, path_save, option):
         for line in lines[1:]:
             meta_data_report, ftp_list = parse_file_search_result_line(line)
             if option != 1:
-                pool = ThreadPool(len(ftp_list))
+                pool = Pool(len(ftp_list))
                 pool.starmap(sub_download, zip([1, 2], ftp_list, [path_save] * len(ftp_list)))
-                # for position, ftp_url in enumerate(ftp_list, 1):
-                #     pool.apply_async(sub_download, args=(position, ftp_url, path_save))
                 pool.close()
                 pool.join()
             meta_data_xml = get_meta_data_from_xml(meta_data_report[1])
