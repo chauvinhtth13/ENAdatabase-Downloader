@@ -8,8 +8,9 @@ import urllib.error
 import urllib.parse as urlparse
 import urllib.request as urlrequest
 import requests
-from multiprocessing.dummy import Pool
-from tqdm import tqdm
+from multiprocessing.pool import ThreadPool
+from tqdm.auto import tqdm
+
 
 VIEW_URL_BASE = 'https://www.ebi.ac.uk/ena/browser/api/'
 PORTAL_SEARCH_BASE = 'https://www.ebi.ac.uk/ena/portal/api/filereport?'
@@ -22,7 +23,8 @@ sample_pattern_1 = re.compile('^SAM[ND]\d{8}$')
 sample_pattern_2 = re.compile('^SAMEA\d{6,}$')
 sample_pattern_3 = re.compile('^[EDS]RS\d{6,}$')
 
-socket.setdefaulttimeout(60)
+socket.setdefaulttimeout(30)
+
 
 def is_run(accession):
     return run_pattern.match(accession)
@@ -78,14 +80,17 @@ def parse_file_search_result_line(line):
 
 def get_report_from_portal(url):
     request = urlrequest.Request(url)
-    response = urlrequest.urlopen(request)
-    if response.status == 200:
-        return response
-    elif response.status == 204:
-        print('ERROR: No records of the requested data group are available associated with the provided accession')
-    else:
-        print('ERROR: ' + response.msg + '\n')
-        print('ERROR: Unable to fetch data from url: ' + url + '\n')
+    try:
+        response = urlrequest.urlopen(request)
+        if response.status == 200:
+            return response
+        elif response.status == 204:
+            print('ERROR: No records of the requested data group are available associated with the provided accession')
+        else:
+            print('ERROR: ' + response.msg + '\n')
+            print('ERROR: Unable to fetch data from url: ' + url + '\n')
+    except urllib.error.HTTPError:
+        print('ERROR: request time out')
 
 
 def download_report_from_portal(url):
@@ -138,14 +143,16 @@ def sub_download(position, ftp_url, path_save):
     file_name = urlparse.unquote(ftp_url.split('/')[-1])
     dest_file = os.path.join(path_save, file_name)
     try:
-        with DownloadProgressBar(unit='B', unit_scale=True, miniters=1, desc=file_name, position=position) as t:
+        with DownloadProgressBar(unit='B', unit_scale=True,
+                                 desc=file_name, position=position, ascii=" >") as t:
             urlrequest.urlretrieve("ftp://" + ftp_url, dest_file, reporthook=t.update_to)
-    except urllib.error.URLError or socket.timeout:
+    except urllib.error.URLError:
         print("Error with FTP transfer occurred for file: {}".format(file_name))
         try:
-            with DownloadProgressBar(unit='B', unit_scale=True, miniters=1, desc=file_name, position=position) as t:
+            with DownloadProgressBar(unit='B', unit_scale=True,
+                                     desc=file_name, position=position, ascii=" >") as t:
                 urlrequest.urlretrieve("https://" + ftp_url, dest_file, reporthook=t.update_to)
-        except urllib.error.URLError or socket.timeout:
+        except urllib.error.URLError:
             print("Error with HTTPS transfer occurred for file: {}".format(file_name))
 
 
@@ -181,7 +188,12 @@ def download_from_ena(accession_code, path_save, option):
         for line in lines[1:]:
             meta_data_report, ftp_list = parse_file_search_result_line(line)
             if option != 1:
-                pool = Pool(len(ftp_list))
+                # for para in zip([1, 2], ftp_list, [path_save] * len(ftp_list)):
+                #     _thread.start_new_thread(sub_download, para)
+                # executor = ThreadPoolExecutor(max_workers=len(ftp_list))
+                # future = executor.submit(sub_download, [1, 2], ftp_list, [path_save] * len(ftp_list))
+                # print(future.done())
+                pool = ThreadPool(len(ftp_list))
                 pool.starmap(sub_download, zip([1, 2], ftp_list, [path_save] * len(ftp_list)))
                 pool.close()
                 pool.join()
