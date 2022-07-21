@@ -7,10 +7,9 @@ import requests
 import urllib.error
 import urllib.request as urlrequest
 import urllib.parse as urlparse
-import socket
 from tqdm import tqdm
 from multiprocessing.dummy import Pool
-
+å
 VIEW_URL_BASE = 'https://www.ebi.ac.uk/ena/browser/api/'
 PORTAL_SEARCH_BASE = 'https://www.ebi.ac.uk/ena/portal/api/filereport?'
 XML_DISPLAY = 'xml/'
@@ -152,7 +151,7 @@ def download_from_ena(accession_code, path_save, option):
     check_path = os.path.isdir(path_save)
     while not check_path:
         print('Path Folder: ' + path_save + ' is not exist')
-        option_path = str(input('You wants create destination directory or input new destination directory ? (Create,'
+        option_path = str(input('You want to create destination directory or input new destination directory ? (Create,'
                                 '[c] | Input,[i]): '))
         while option_path not in {'c', 'i'}:
             option_path = str(input("I think you have some mistake to input wrong character. Please input again ("
