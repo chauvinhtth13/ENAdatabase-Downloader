@@ -2,6 +2,7 @@ import argparse
 import csv
 import os
 import re
+import socket
 import sys
 import urllib.error
 import urllib.parse as urlparse
@@ -21,6 +22,7 @@ sample_pattern_1 = re.compile('^SAM[ND]\d{8}$')
 sample_pattern_2 = re.compile('^SAMEA\d{6,}$')
 sample_pattern_3 = re.compile('^[EDS]RS\d{6,}$')
 
+socket.setdefaulttimeout(60)
 
 def is_run(accession):
     return run_pattern.match(accession)
@@ -138,12 +140,12 @@ def sub_download(position, ftp_url, path_save):
     try:
         with DownloadProgressBar(unit='B', unit_scale=True, miniters=1, desc=file_name, position=position) as t:
             urlrequest.urlretrieve("ftp://" + ftp_url, dest_file, reporthook=t.update_to)
-    except urllib.error.URLError:
+    except urllib.error.URLError or socket.timeout:
         print("Error with FTP transfer occurred for file: {}".format(file_name))
         try:
             with DownloadProgressBar(unit='B', unit_scale=True, miniters=1, desc=file_name, position=position) as t:
                 urlrequest.urlretrieve("https://" + ftp_url, dest_file, reporthook=t.update_to)
-        except urllib.error.URLError:
+        except urllib.error.URLError or socket.timeout:
             print("Error with HTTPS transfer occurred for file: {}".format(file_name))
 
 
