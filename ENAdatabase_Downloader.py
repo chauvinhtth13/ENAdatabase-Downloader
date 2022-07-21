@@ -23,8 +23,6 @@ sample_pattern_1 = re.compile('^SAM[ND]\d{8}$')
 sample_pattern_2 = re.compile('^SAMEA\d{6,}$')
 sample_pattern_3 = re.compile('^[EDS]RS\d{6,}$')
 
-socket.setdefaulttimeout(30)
-
 
 def is_run(accession):
     return run_pattern.match(accession)
@@ -133,6 +131,10 @@ def get_meta_data_from_xml(accession):
 
 
 class DownloadProgressBar(tqdm):
+    def __init__(self, iterable=None, *nargs, **kwargs):
+        super().__init__(iterable, nargs, kwargs)
+        self.total = None
+
     def update_to(self, b=1, bsize=1, tsize=None):
         if tsize is not None:
             self.total = tsize
@@ -145,15 +147,9 @@ def sub_download(position, ftp_url, path_save):
     try:
         with DownloadProgressBar(unit='B', unit_scale=True,
                                  desc=file_name, position=position, ascii=" >") as t:
-            urlrequest.urlretrieve("ftp://" + ftp_url, dest_file, reporthook=t.update_to)
+            urlrequest.urlretrieve("https://" + ftp_url, dest_file, reporthook=t.update_to)
     except urllib.error.URLError:
-        print("Error with FTP transfer occurred for file: {}".format(file_name))
-        try:
-            with DownloadProgressBar(unit='B', unit_scale=True,
-                                     desc=file_name, position=position, ascii=" >") as t:
-                urlrequest.urlretrieve("https://" + ftp_url, dest_file, reporthook=t.update_to)
-        except urllib.error.URLError:
-            print("Error with HTTPS transfer occurred for file: {}".format(file_name))
+        print("Error with HTTPS transfer occurred for file: {}".format(file_name))
 
 
 def download_from_ena(accession_code, path_save, option):
@@ -188,11 +184,6 @@ def download_from_ena(accession_code, path_save, option):
         for line in lines[1:]:
             meta_data_report, ftp_list = parse_file_search_result_line(line)
             if option != 1:
-                # for para in zip([1, 2], ftp_list, [path_save] * len(ftp_list)):
-                #     _thread.start_new_thread(sub_download, para)
-                # executor = ThreadPoolExecutor(max_workers=len(ftp_list))
-                # future = executor.submit(sub_download, [1, 2], ftp_list, [path_save] * len(ftp_list))
-                # print(future.done())
                 pool = ThreadPool(len(ftp_list))
                 pool.starmap(sub_download, zip([1, 2], ftp_list, [path_save] * len(ftp_list)))
                 pool.close()
