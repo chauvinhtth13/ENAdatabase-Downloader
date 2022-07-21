@@ -150,8 +150,7 @@ def sub_download(position, ftp_url, path_save):
         with DownloadProgressBar(unit='B', unit_scale=True,
                                  desc=file_name, position=position, ascii=" >") as t:
             urlrequest.urlretrieve("ftp://" + ftp_url, dest_file, reporthook=t.update_to)
-    except Exception as e:
-        print("Error failed: {}", e)
+    except urllib.error.URLError:
         print("Error with FTP transfer occurred for file: {}".format(file_name))
         try:
             # print(file_name)
@@ -159,8 +158,7 @@ def sub_download(position, ftp_url, path_save):
             with DownloadProgressBar(unit='B', unit_scale=True,
                                      desc=file_name, position=position, ascii=" >") as t:
                 urlrequest.urlretrieve("https://" + ftp_url, dest_file, reporthook=t.update_to)
-        except Exception as e:
-            print("Error failed: {}", e)
+        except urllib.error.URLError:
             print("Error with HTTPS transfer occurred for file: {}".format(file_name))
 
 
