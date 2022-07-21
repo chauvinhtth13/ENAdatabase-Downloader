@@ -147,9 +147,15 @@ def sub_download(position, ftp_url, path_save):
     try:
         with DownloadProgressBar(unit='B', unit_scale=True,
                                  desc=file_name, position=position, ascii=" >") as t:
-            urlrequest.urlretrieve("https://" + ftp_url, dest_file, reporthook=t.update_to)
+            urlrequest.urlretrieve("ftp://" + ftp_url, dest_file, reporthook=t.update_to)
     except urllib.error.URLError:
-        print("Error with HTTPS transfer occurred for file: {}".format(file_name))
+        print("Error with FTP transfer occurred for file: {}".format(file_name))
+        try:
+            with DownloadProgressBar(unit='B', unit_scale=True,
+                                     desc=file_name, position=position, ascii=" >") as t:
+                urlrequest.urlretrieve("https://" + ftp_url, dest_file, reporthook=t.update_to)
+        except urllib.error.URLError:
+            print("Error with HTTPS transfer occurred for file: {}".format(file_name))
 
 
 def download_from_ena(accession_code, path_save, option):
