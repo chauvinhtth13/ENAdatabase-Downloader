@@ -7,7 +7,6 @@ import urllib.error
 import urllib.parse as urlparse
 import urllib.request as urlrequest
 import requests
-#import wget
 from multiprocessing.dummy import Pool
 from tqdm.auto import tqdm
 
@@ -141,8 +140,6 @@ def sub_download(position, ftp_url, path_save):
     file_name = urlparse.unquote(ftp_url.split('/')[-1])
     dest_file = os.path.join(path_save, file_name)
     try:
-        # print(file_name)
-        # wget.download(url="ftp://" + ftp_url, out=dest_file, bar=wget.bar_adaptive)
         with DownloadProgressBar(unit='B', unit_scale=True,
                                  desc=file_name, position=position, ascii=" >") as t:
             urlrequest.urlretrieve("ftp://" + ftp_url, dest_file, reporthook=t.update_to)
@@ -150,8 +147,6 @@ def sub_download(position, ftp_url, path_save):
         print(e)
         print("Error with FTP transfer occurred for file: {}".format(file_name))
         try:
-            # print(file_name)
-            # wget.download(url="https://" + ftp_url, out=dest_file, bar=wget.bar_adaptive)
             with DownloadProgressBar(unit='B', unit_scale=True,
                                      desc=file_name, position=position, ascii=" >") as t:
                 urlrequest.urlretrieve("https://" + ftp_url, dest_file, reporthook=t.update_to)
@@ -192,8 +187,6 @@ def download_from_ena(accession_code, path_save, option):
         for line in lines[1:]:
             meta_data_report, ftp_list = parse_file_search_result_line(line)
             if option != 1:
-                # for index, ftp_url in enumerate(ftp_list,1):
-                #     sub_download(index, ftp_url, path_save)
                 pool = Pool(len(ftp_list))
                 pool.starmap(sub_download, zip([1, 2], ftp_list, [path_save] * len(ftp_list)))
                 pool.close()
@@ -259,8 +252,8 @@ if __name__ == '__main__':
 
     if len(list_accession) > 0:
         print("Please check list accession number for download again")
-        print("List accession number will be download: " + str(list_accession))
-        print("List accession number will not be download: " + str(list_wrong))
+        print("List accession number will be download", len(list_accession), "accession:", str(list_accession))
+        print("List accession number will not be download", len(list_wrong), "accession:", str(list_wrong))
         check = str(input("Do you want continue to download ? (Yes,[y] | No,[n]): "))
         while check not in {'yes', 'y', 'Y', 'no', 'n', 'N'}:
             check = str(input("I think you have some mistake with input wrong character. Please input again (Yes,"
@@ -278,6 +271,7 @@ if __name__ == '__main__':
                 with open(os.path.join(args.output, "metadata.csv"), 'w') as f:
                     fc = csv.writer(f, lineterminator='\n')
                     fc.writerows(full_metadata)
+            print("Path metadata: " + os.path.join(args.output, "metadata.csv"))
             print("Done. See ya!!!! ^_^.")
         else:
             print("Thank you. Bye!! T_T ")
