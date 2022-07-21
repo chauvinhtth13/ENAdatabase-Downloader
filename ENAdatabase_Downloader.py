@@ -3,13 +3,13 @@ import csv
 import os
 import re
 import sys
-import requests
 import urllib.error
-import urllib.request as urlrequest
 import urllib.parse as urlparse
-from tqdm import tqdm
+import urllib.request as urlrequest
+import requests
 from multiprocessing.dummy import Pool
-å
+from tqdm import tqdm
+
 VIEW_URL_BASE = 'https://www.ebi.ac.uk/ena/browser/api/'
 PORTAL_SEARCH_BASE = 'https://www.ebi.ac.uk/ena/portal/api/filereport?'
 XML_DISPLAY = 'xml/'
