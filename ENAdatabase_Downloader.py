@@ -10,8 +10,10 @@ import urllib.request as urlrequest
 import requests
 from multiprocessing.dummy import Pool
 from tqdm.auto import tqdm
+from datetime import datetime
 
-
+now = datetime.now()
+current_time = now.strftime("%d_%m_%Y %H_%M_%S")
 VIEW_URL_BASE = "https://www.ebi.ac.uk/ena/browser/api/"
 PORTAL_SEARCH_BASE = "https://www.ebi.ac.uk/ena/portal/api/filereport?"
 XML_DISPLAY = "xml/"
@@ -136,13 +138,13 @@ def sub_download(position, ftp_url, path_save):
         with DownloadProgressBar(unit="B", unit_scale=True,
                                  desc=file_name, position=position, ascii=" >") as t:
             urlrequest.urlretrieve("ftp://" + ftp_url, dest_file, reporthook=t.update_to)
-    except Exception:
+    except (urllib.error.URLError, urllib.error.HTTPError):
         print("Error with FTP transfer occurred for file: {}".format(file_name))
         try:
             with DownloadProgressBar(unit="B", unit_scale=True,
                                      desc=file_name, position=position, ascii=" >") as t:
                 urlrequest.urlretrieve("https://" + ftp_url, dest_file, reporthook=t.update_to)
-        except Exception:
+        except (urllib.error.URLError, urllib.error.HTTPError):
             print("Error with HTTPS transfer occurred for file: {}".format(file_name))
 
 
@@ -192,7 +194,7 @@ def download_from_ena(accession_code, path_save, option):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Download Fastq on ENA database. Make by Vinh Chau ("
+    parser = argparse.ArgumentParser(description="Download Fastq on ENA database. Made by Vinh Chau ("
                                                  "chauvinhtth13@gmail.com)")
     parser.add_argument("-if", "--ifile", type=str, default="",
                         help="Input list accession number by file (.csv)")
@@ -201,6 +203,8 @@ if __name__ == "__main__":
                              "between accession with comma")
     parser.add_argument("-o", "--output", default=os.getenv("HOME") + "/Downloads", type=str,
                         help="Path directory to save file")
+    parser.add_argument("-m", "--meta_file", default="[metadata]["+current_time+"].csv", type=str,
+                        help="Filename metadata file")
     parser.add_argument("-op", "--download_option", default=0, type=int,
                         help="0: Default Download Metadata and Fastq file \n "
                              "1: Download Only Metafile \n"
@@ -256,19 +260,20 @@ if __name__ == "__main__":
                               "study_alias", "collection_date", "geographic_location", "host", "host_disease",
                               "isolation_source"]]
             for each_accession in list_accession:
-                try:
-                    each_metadata = download_from_ena(each_accession, args.output, args.download_option)
-                    full_metadata.extend(each_metadata)
-                except Exception as e:
+                each_metadata = download_from_ena(each_accession, args.output, args.download_option)
+                if not each_metadata:
                     pass
+                full_metadata.extend(each_metadata)
+
             if args.download_option != 2:
-                with open(os.path.join(args.output, "metadata.csv"), "w") as f:
+                with open(os.path.join(args.output, args.meta_file), "w") as f:
                     fc = csv.writer(f, lineterminator="\n")
                     fc.writerows(full_metadata)
-            print("Path metadata: " + os.path.join(args.output, "metadata.csv"))
+            print("Path metadata: " + os.path.join(args.output, args.meta_file))
             print("Done. See ya!!!! ^_^.")
         else:
             print("Thank you. Bye!! T_T ")
             sys.exit(0)
+
     else:
         parser.print_help()
