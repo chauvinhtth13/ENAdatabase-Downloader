@@ -10,7 +10,7 @@ import urllib.request as urlrequest
 import requests
 from multiprocessing.dummy import Pool
 from tqdm.auto import tqdm
-import socket
+
 
 VIEW_URL_BASE = "https://www.ebi.ac.uk/ena/browser/api/"
 PORTAL_SEARCH_BASE = "https://www.ebi.ac.uk/ena/portal/api/filereport?"
@@ -123,10 +123,6 @@ def get_meta_data_from_xml(accession):
 
 
 class DownloadProgressBar(tqdm):
-    def __init__(self, iterable=None, *args_bar, **kwargs):
-        super().__init__(iterable, args_bar, kwargs)
-        self.total = None
-
     def update_to(self, b=1, bsize=1, tsize=None):
         if tsize is not None:
             self.total = tsize
@@ -137,23 +133,20 @@ def sub_download(position, ftp_url, path_save):
     file_name = urlparse.unquote(ftp_url.split("/")[-1])
     dest_file = os.path.join(path_save, file_name)
     try:
-        #urlrequest.urlopen("ftp://" + ftp_url)
         with DownloadProgressBar(unit="B", unit_scale=True,
                                  desc=file_name, position=position, ascii=" >") as t:
             urlrequest.urlretrieve("ftp://" + ftp_url, dest_file, reporthook=t.update_to)
-    except socket.timeout:
+    except Exception:
         print("Error with FTP transfer occurred for file: {}".format(file_name))
         try:
-            #urlrequest.urlopen("https://" + ftp_url)
             with DownloadProgressBar(unit="B", unit_scale=True,
                                      desc=file_name, position=position, ascii=" >") as t:
                 urlrequest.urlretrieve("https://" + ftp_url, dest_file, reporthook=t.update_to)
-        except socket.timeout:
+        except Exception:
             print("Error with HTTPS transfer occurred for file: {}".format(file_name))
 
 
 def download_from_ena(accession_code, path_save, option):
-
     check_path = os.path.isdir(path_save)
     while not check_path:
         print("Path Folder: " + path_save + " is not exist")
@@ -263,10 +256,11 @@ if __name__ == "__main__":
                               "study_alias", "collection_date", "geographic_location", "host", "host_disease",
                               "isolation_source"]]
             for each_accession in list_accession:
-                each_metadata = download_from_ena(each_accession, args.output, args.download_option)
-                if not each_metadata:
+                try:
+                    each_metadata = download_from_ena(each_accession, args.output, args.download_option)
+                    full_metadata.extend(each_metadata)
+                except Exception as e:
                     pass
-                full_metadata.extend(each_metadata)
             if args.download_option != 2:
                 with open(os.path.join(args.output, "metadata.csv"), "w") as f:
                     fc = csv.writer(f, lineterminator="\n")
