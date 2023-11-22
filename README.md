@@ -18,13 +18,13 @@ This tool draws inspiration from notable repositories:
 ## Versions
 ### Version 1 ([ENAdatabase_Downloader.py](https://github.com/chauvinhtth13/ENAdatabase-Downloader/blob/main/ENAdatabase_Downloader.py))
 The initial version, following the structure of the original by [@chauvinhtth13](https://github.com/chauvinhtth13), without integration of `aira2`.
-### Version 2 (aria2_ena_v1.py)
+### Version 2 ([aria2_ena_v1.py](https://github.com/tnmquann/ENAdatabase-Downloader/blob/main/aria2_ena_v1.py))
 Integrated `aria2` into the tool with notable changes:
 - Import `subprocess` package
 - Remove `tqdm.auto` module and download progress bar
 - Remove `sub_download` function
 - Support for output results containing download links for `fastq.gz` files.
-### Version 3 (aria2_ena_v2.py)
+### Version 3 ([aria2_ena_v2.py](https://github.com/tnmquann/ENAdatabase-Downloader/blob/main/aria2_ena_v2.py))
 Building upon the improvements in Version 2, Version 3 introduces:
 - Combined similar regular expression patterns into lists for better readability.
 - Used f-strings for string formatting for improved readability.
@@ -42,7 +42,7 @@ Building upon the improvements in Version 2, Version 3 introduces:
     git clone https://github.com/tnmquann/ENAdatabase-Downloader.git
    ```
 2. Ensure `aria2` is installed.
-4. Replace "PATH_TO_ARIA2" in the code with the actual path to `aria2` on your computer.
+4. Replace `'PATH_TO_ARIA2'` in the code with the actual path to `aria2` on your computer.
 5. Run the tool, providing the necessary parameters for downloading sequences.
 
 ## Options
