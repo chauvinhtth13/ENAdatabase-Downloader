@@ -65,4 +65,25 @@ Building upon the improvements in Version 2, Version 3 introduces:
 - You can use other package to download data instead of using `aria2`.
 - Other customization for `aria2` please following at the developer's [homepage](https://github.com/aria2/aria2).
 
+## How to cite
+- Version 1:
+```
+@misc{ENACV,
+  author = {Vinh Chau},
+  title = {ENAdatabase-Downloader},
+  year = {2018},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{https://github.com/chauvinhtth13/ENAdatabase-Downloader}},
+}
+```
+- Version 2 & 3:
+```
+@misc{tnmquannENACV,
+  author = {Minh-Quan Ton-Ngoc}
+  title = {tnmquann/{{ENAdatabase-Downloader}}: {{Using}} aria2 package to download multi FASTQ on {{ENA}} Database.},
+  urldate = {2023-11-22},
+  howpublished = {\url{https://github.com/tnmquann/ENAdatabase-Downloader}},
+}
+```
 Feel free to explore the different versions and choose the one that best fits your needs. Happy coding!
